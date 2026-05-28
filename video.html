@@ -1,0 +1,779 @@
+<!-- video.html (前台) - 仅修改播放器相关部分 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>StreamVibe - 在线视频平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#e50914',
+                        dark: '#141414',
+                        darker: '#0f0f0f',
+                        card: '#1a1a1a'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; color: #fff; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .video-card:hover .play-overlay { opacity: 1; transform: scale(1); }
+        .video-card:hover .card-image { transform: scale(1.05); }
+        .hero-gradient {
+            background: linear-gradient(to top, #0f0f0f 0%, transparent 50%),
+                        linear-gradient(to right, #0f0f0f 0%, transparent 50%);
+        }
+        .progress-bar { background: linear-gradient(90deg, #e50914 0%, #ff6b6b 100%); }
+        .modal-enter { animation: modalEnter 0.3s ease-out; }
+        @keyframes modalEnter { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .episode-btn.active { background-color: #e50914; border-color: #e50914; }
+        
+        /* 移动端优化 */
+        @media (max-width: 640px) {
+            .hero-title { font-size: 2.5rem; line-height: 1.2; }
+            .video-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        
+        /* 选集面板样式 - 从底部弹出 */
+        .episode-panel {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            max-height: 70%;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(12px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px 20px 0 0;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .episode-panel.show {
+            transform: translateY(0);
+        }
+        
+        .episode-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            flex-shrink: 0;
+        }
+        
+        .episode-panel-body {
+            overflow-y: auto;
+            padding: 12px 16px;
+            flex: 1;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* 选集按钮样式 */
+        .episode-item {
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+        
+        .episode-item.active {
+            background: rgba(229, 9, 20, 0.2);
+            border-color: #e50914;
+        }
+        
+        .episode-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .episode-item.active:hover {
+            background: rgba(229, 9, 20, 0.3);
+        }
+        
+        /* 控制栏样式 */
+        .player-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 8px 16px 16px;
+            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+            z-index: 11;
+        }
+        
+        /* 拖拽条 */
+        .drag-handle {
+            width: 40px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            margin: 8px auto;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Navigation -->
+    <nav id="navbar" class="fixed top-0 w-full z-50 transition-all duration-300 bg-gradient-to-b from-black/80 to-transparent">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-4 sm:space-x-8">
+                    <a href="#" class="flex items-center space-x-2" onclick="app.goHome(); return false;">
+                        <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                            <i class="fas fa-play text-white text-sm"></i>
+                        </div>
+                        <span class="text-xl sm:text-2xl font-bold tracking-tighter">StreamVibe</span>
+                    </a>
+                    <div class="hidden md:flex items-center space-x-6 text-sm font-medium text-gray-300">
+                        <a href="#" class="hover:text-white transition-colors" onclick="app.filterCategory('all'); return false;">首页</a>
+                        <a href="#" class="hover:text-white transition-colors" onclick="app.filterCategory('movie'); return false;">电影</a>
+                        <a href="#" class="hover:text-white transition-colors" onclick="app.filterCategory('series'); return false;">剧集</a>
+                        <a href="#" class="hover:text-white transition-colors" onclick="app.filterCategory('documentary'); return false;">纪录片</a>
+                        <a href="#" class="hover:text-white transition-colors" onclick="app.filterCategory('anime'); return false;">动漫</a>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <div class="relative hidden sm:block">
+                        <input type="text" id="searchInput" placeholder="搜索..." 
+                               class="bg-black/50 border border-gray-700 rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-primary w-40 lg:w-48 transition-all duration-300 text-white placeholder-gray-500"
+                               oninput="app.handleSearch(this.value)">
+                        <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 text-sm"></i>
+                    </div>
+                    <button onclick="document.getElementById('searchInput').classList.toggle('hidden'); document.getElementById('searchInput').focus()" class="sm:hidden w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-gray-400">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <a href="admin.html" class="hidden md:flex items-center space-x-2 bg-white/10 hover:bg-white/20 rounded-full px-4 py-2 transition-colors text-sm">
+                        <i class="fas fa-cog text-gray-400"></i>
+                        <span class="text-gray-300">管理</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="mainContent">
+        <!-- Hero Section -->
+        <section id="heroSection" class="relative h-[60vh] sm:h-screen sm:max-h-[85vh] overflow-hidden">
+            <div class="absolute inset-0">
+                <img id="heroImage" src="" alt="" class="w-full h-full object-cover">
+                <div class="absolute inset-0 hero-gradient"></div>
+            </div>
+            <div class="relative h-full flex items-end pb-8 sm:pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+                <div class="max-w-2xl space-y-3 sm:space-y-6">
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm">
+                        <span class="bg-primary/20 text-primary px-2 py-1 sm:px-3 sm:py-1 rounded-full font-semibold">精选推荐</span>
+                        <span id="heroMeta" class="text-gray-300"></span>
+                        <span class="flex items-center text-yellow-400"><i class="fas fa-star mr-1"></i> <span id="heroRating"></span></span>
+                    </div>
+                    <h1 id="heroTitle" class="text-3xl sm:text-5xl md:text-7xl font-bold leading-tight"></h1>
+                    <p id="heroDesc" class="text-sm sm:text-lg text-gray-300 line-clamp-2 max-w-xl"></p>
+                    <div class="flex items-center space-x-3 pt-2">
+                        <button onclick="app.playHero()" class="bg-primary hover:bg-red-700 text-white px-6 py-2.5 sm:px-8 sm:py-3 rounded-lg font-semibold flex items-center space-x-2 transition-all active:scale-95 text-sm sm:text-base">
+                            <i class="fas fa-play"></i>
+                            <span>立即播放</span>
+                        </button>
+                        <button onclick="app.showHeroDetails()" class="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-5 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold flex items-center space-x-2 transition-all text-sm sm:text-base">
+                            <i class="fas fa-info"></i>
+                            <span>详情</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Categories -->
+        <section class="sticky top-0 z-40 bg-darker/95 backdrop-blur-md border-b border-gray-800/50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+                <div class="flex items-center space-x-2 overflow-x-auto scrollbar-hide" id="categoryPills">
+                    <button onclick="app.filterCategory('all')" class="category-pill active whitespace-nowrap px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all bg-primary text-white">全部</button>
+                    <button onclick="app.filterCategory('movie')" class="category-pill whitespace-nowrap px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all bg-white/5 hover:bg-white/10 text-gray-300">电影</button>
+                    <button onclick="app.filterCategory('series')" class="category-pill whitespace-nowrap px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all bg-white/5 hover:bg-white/10 text-gray-300">剧集</button>
+                    <button onclick="app.filterCategory('documentary')" class="category-pill whitespace-nowrap px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all bg-white/5 hover:bg-white/10 text-gray-300">纪录片</button>
+                    <button onclick="app.filterCategory('anime')" class="category-pill whitespace-nowrap px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all bg-white/5 hover:bg-white/10 text-gray-300">动漫</button>
+                    <button onclick="app.filterCategory('variety')" class="category-pill whitespace-nowrap px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all bg-white/5 hover:bg-white/10 text-gray-300">综艺</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Content Sections -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+            <section>
+                <div class="flex items-center justify-between mb-4 sm:mb-6">
+                    <h2 class="text-xl sm:text-2xl font-bold flex items-center"><i class="fas fa-fire text-primary mr-2 sm:mr-3"></i>热门推荐</h2>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4" id="trendingGrid"></div>
+            </section>
+
+            <section id="continueSection" class="hidden">
+                <div class="flex items-center justify-between mb-4 sm:mb-6">
+                    <h2 class="text-xl sm:text-2xl font-bold flex items-center"><i class="fas fa-clock-rotate-left text-blue-400 mr-2 sm:mr-3"></i>继续观看</h2>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4" id="continueGrid"></div>
+            </section>
+
+            <section>
+                <div class="flex items-center justify-between mb-4 sm:mb-6">
+                    <h2 class="text-xl sm:text-2xl font-bold flex items-center"><i class="fas fa-sparkles text-yellow-400 mr-2 sm:mr-3"></i>最新上线</h2>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4" id="newGrid"></div>
+            </section>
+
+            <section>
+                <div class="flex items-center justify-between mb-4 sm:mb-6">
+                    <h2 class="text-xl sm:text-2xl font-bold flex items-center"><i class="fas fa-trophy text-yellow-500 mr-2 sm:mr-3"></i>高分榜</h2>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4" id="ratedGrid"></div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden fixed inset-0 z-40 bg-darker flex items-center justify-center">
+        <div class="text-center p-4">
+            <i class="fas fa-film text-5xl sm:text-6xl text-gray-700 mb-4"></i>
+            <h2 class="text-xl sm:text-2xl font-bold text-gray-500 mb-2">暂无视频</h2>
+            <p class="text-gray-600">管理员尚未上传视频数据</p>
+        </div>
+    </div>
+
+    <!-- Video Player Modal - 优化后的版本 -->
+    <div id="playerModal" class="fixed inset-0 z-[60] hidden bg-black">
+        <div class="relative h-full flex flex-col">
+            <!-- 顶部控制栏 -->
+            <div class="absolute top-0 left-0 right-0 z-20 p-3 sm:p-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent">
+                <button onclick="app.closePlayer()" class="text-white hover:bg-white/20 p-2 rounded-full transition-colors">
+                    <i class="fas fa-arrow-left text-lg sm:text-xl"></i>
+                </button>
+                <h3 id="playerTitle" class="text-base sm:text-lg font-semibold truncate max-w-[200px] sm:max-w-md"></h3>
+                <!-- 选集按钮 -->
+                <button id="episodeToggleBtn" onclick="app.toggleEpisodePanel()" class="text-white hover:bg-white/20 p-2 rounded-full transition-colors hidden">
+                    <i class="fas fa-list text-lg sm:text-xl"></i>
+                </button>
+                <div class="w-8 sm:w-10" id="episodeTogglePlaceholder"></div>
+            </div>
+            
+            <!-- 视频播放区域 -->
+            <div class="flex-1 flex items-center justify-center bg-black relative" id="videoContainer">
+                <video id="mainVideo" class="w-full h-full max-h-screen" controls playsinline>
+                    <source src="" type="video/mp4">
+                </video>
+                
+                <!-- 选集面板 - 从底部弹出 -->
+                <div id="episodePanel" class="episode-panel">
+                    <div class="drag-handle"></div>
+                    <div class="episode-panel-header">
+                        <h3 class="text-lg font-bold flex items-center">
+                            <i class="fas fa-list mr-2 text-primary"></i>选集
+                        </h3>
+                        <button onclick="app.toggleEpisodePanel()" class="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="episode-panel-body" id="episodeList">
+                        <!-- 剧集列表将动态填充 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Details Modal -->
+    <div id="detailsModal" class="fixed inset-0 z-[60] hidden overflow-y-auto">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="app.closeDetails()"></div>
+        <div class="relative min-h-screen flex items-center justify-center p-3 sm:p-4">
+            <div class="bg-card rounded-xl sm:rounded-2xl max-w-4xl w-full overflow-hidden modal-enter shadow-2xl border border-gray-800">
+                <div class="relative h-48 sm:h-96">
+                    <img id="detailImage" src="" alt="" class="w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent"></div>
+                    <button onclick="app.closeDetails()" class="absolute top-3 right-3 sm:top-4 sm:right-4 bg-black/50 hover:bg-black/70 text-white w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-colors">
+                        <i class="fas fa-times text-sm sm:text-base"></i>
+                    </button>
+                    <div class="absolute bottom-4 sm:bottom-6 left-4 sm:left-6 right-4 sm:right-6">
+                        <h2 id="detailTitle" class="text-2xl sm:text-4xl font-bold mb-1 sm:mb-2"></h2>
+                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm">
+                            <span id="detailYear" class="text-gray-300"></span>
+                            <span class="text-gray-600">|</span>
+                            <span id="detailGenre" class="text-gray-300"></span>
+                            <span class="text-gray-600">|</span>
+                            <span class="flex items-center text-yellow-400"><i class="fas fa-star mr-1"></i> <span id="detailRating"></span></span>
+                            <span class="text-gray-600">|</span>
+                            <span id="detailDuration" class="text-gray-300"></span>
+                            <span class="text-gray-600">|</span>
+                            <span id="detailEpisodesCount" class="text-gray-300"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4 sm:p-6 space-y-5">
+                    <p id="detailDesc" class="text-sm sm:text-base text-gray-300 leading-relaxed"></p>
+                    <div class="flex items-center space-x-3 flex-wrap gap-y-3">
+                        <button onclick="app.playCurrentDetail()" class="bg-primary hover:bg-red-700 text-white px-6 py-2.5 sm:px-8 sm:py-3 rounded-lg font-semibold flex items-center space-x-2 transition-all active:scale-95 text-sm sm:text-base">
+                            <i class="fas fa-play"></i><span>立即播放</span>
+                        </button>
+                    </div>
+                    <div id="detailEpisodes" class="border-t border-gray-800 pt-5 hidden">
+                        <h3 class="text-lg sm:text-xl font-bold mb-4">剧集列表</h3>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3" id="detailEpisodeList"></div>
+                    </div>
+                    <div class="border-t border-gray-800 pt-5">
+                        <h3 class="text-lg sm:text-xl font-bold mb-4">相似推荐</h3>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4" id="similarGrid"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white text-black px-5 py-3 rounded-full shadow-2xl transform translate-y-20 opacity-0 transition-all duration-300 z-[70] font-medium flex items-center space-x-2 text-sm">
+        <i class="fas fa-check-circle text-green-500"></i>
+        <span id="toastMessage"></span>
+    </div>
+
+    <script>
+        // ============ 核心应用逻辑 ============
+        const app = {
+            videos: [],
+            currentCategory: 'all',
+            currentDetailId: null,
+            currentEpisode: 0,
+            episodePanelVisible: false,
+
+            async init() {
+                await this.loadVideos();
+                this.setupNavbar();
+                this.setupKeyboard();
+                this.setupEpisodePanelDrag();
+                
+                if (this.videos.length === 0) {
+                    document.getElementById('emptyState').classList.remove('hidden');
+                    document.getElementById('mainContent').classList.add('hidden');
+                } else {
+                    this.renderAll();
+                    this.loadHero();
+                    this.loadContinueWatching();
+                }
+            },
+
+            async loadVideos() {
+                try {
+                    const response = await fetch('./data.json?t=' + Date.now());
+                    if (!response.ok) throw new Error('Failed to load data.json');
+                    const data = await response.json();
+                    this.videos = Array.isArray(data) ? data : (data.videos || []);
+                } catch (e) {
+                    console.error('Failed to load videos:', e);
+                    this.videos = [];
+                }
+            },
+
+            setupNavbar() {
+                const navbar = document.getElementById('navbar');
+                window.addEventListener('scroll', () => {
+                    if (window.scrollY > 50) {
+                        navbar.classList.add('bg-black/90', 'backdrop-blur-md');
+                        navbar.classList.remove('bg-gradient-to-b');
+                    } else {
+                        navbar.classList.remove('bg-black/90', 'backdrop-blur-md');
+                        navbar.classList.add('bg-gradient-to-b');
+                    }
+                });
+            },
+
+            setupKeyboard() {
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        if (this.episodePanelVisible) {
+                            this.toggleEpisodePanel(false);
+                        } else {
+                            this.closePlayer();
+                            this.closeDetails();
+                        }
+                    }
+                });
+            },
+
+            // 设置选集面板拖拽关闭
+            setupEpisodePanelDrag() {
+                const panel = document.getElementById('episodePanel');
+                let startY = 0;
+                let currentY = 0;
+
+                panel.addEventListener('touchstart', (e) => {
+                    if (e.target.closest('.drag-handle')) {
+                        startY = e.touches[0].clientY;
+                        panel.style.transition = 'none';
+                    }
+                });
+
+                panel.addEventListener('touchmove', (e) => {
+                    if (startY) {
+                        currentY = e.touches[0].clientY;
+                        const diff = currentY - startY;
+                        if (diff > 0) {
+                            panel.style.transform = `translateY(${diff}px)`;
+                        }
+                    }
+                });
+
+                panel.addEventListener('touchend', () => {
+                    if (startY && currentY) {
+                        panel.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+                        if (currentY - startY > 100) {
+                            this.toggleEpisodePanel(false);
+                        } else {
+                            panel.style.transform = 'translateY(0)';
+                        }
+                    }
+                    startY = 0;
+                    currentY = 0;
+                });
+            },
+
+            // 切换选集面板显示/隐藏
+            toggleEpisodePanel(show = null) {
+                const panel = document.getElementById('episodePanel');
+                if (show === true || (!this.episodePanelVisible && show !== false)) {
+                    panel.classList.add('show');
+                    this.episodePanelVisible = true;
+                } else {
+                    panel.classList.remove('show');
+                    this.episodePanelVisible = false;
+                }
+            },
+
+            loadHero() {
+                if (this.videos.length === 0) return;
+                const hero = [...this.videos].sort((a, b) => b.rating - a.rating)[0];
+                
+                document.getElementById('heroImage').src = hero.backdrop || hero.poster;
+                document.getElementById('heroTitle').textContent = hero.title;
+                document.getElementById('heroDesc').textContent = hero.description || '';
+                document.getElementById('heroMeta').textContent = `${hero.year} · ${hero.genre || this.getCategoryName(hero.category)} · ${hero.duration}`;
+                document.getElementById('heroRating').textContent = hero.rating;
+            },
+
+            getCategoryName(cat) {
+                const map = { movie: '电影', series: '剧集', documentary: '纪录片', anime: '动漫', variety: '综艺' };
+                return map[cat] || cat;
+            },
+
+            loadContinueWatching() {
+                const hasProgress = this.videos.filter(v => v.progress > 0);
+                const section = document.getElementById('continueSection');
+                
+                if (hasProgress.length > 0) {
+                    section.classList.remove('hidden');
+                    document.getElementById('continueGrid').innerHTML = hasProgress.map(v => this.createCard(v, true)).join('');
+                } else {
+                    section.classList.add('hidden');
+                }
+            },
+
+            createCard(video, showProgress = false) {
+                const isSeries = video.category === 'series' || (video.episodes && video.episodes.length > 0);
+                const totalEpisodes = video.totalEpisodes || video.episodes?.length || 0;
+                
+                return `
+                    <div class="video-card group relative rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:scale-105 hover:z-10"
+                         onclick="app.showDetails('${video.id}')">
+                        <div class="relative aspect-[2/3] overflow-hidden bg-gray-800">
+                            <img src="${video.poster}" alt="${video.title}" 
+                                 class="card-image w-full h-full object-cover transition-transform duration-500"
+                                 onerror="this.src='https://via.placeholder.com/600x900?text=No+Image'">
+                            <div class="play-overlay absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 transition-all duration-300 transform scale-90">
+                                <div class="w-12 h-12 sm:w-14 sm:h-14 bg-primary/90 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-play text-white text-base sm:text-lg ml-0.5"></i>
+                                </div>
+                            </div>
+                            <div class="absolute top-2 left-2 flex space-x-1">
+                                ${video.rating >= 9 ? '<span class="bg-yellow-500/90 text-black text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded">TOP</span>' : ''}
+                                ${isSeries ? `<span class="bg-blue-600/90 text-white text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded">${totalEpisodes > 0 ? totalEpisodes + '集' : '剧集'}</span>` : ''}
+                            </div>
+                            <div class="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] sm:text-xs px-2 py-0.5 rounded">
+                                ${isSeries && totalEpisodes > 0 ? `共${totalEpisodes}集` : video.duration}
+                            </div>
+                        </div>
+                        ${showProgress ? `<div class="absolute bottom-0 left-0 right-0 h-1 bg-gray-800"><div class="h-full progress-bar" style="width: ${video.progress}%"></div></div>` : ''}
+                        <div class="mt-2 sm:mt-3 space-y-1">
+                            <h3 class="font-semibold text-white group-hover:text-primary transition-colors truncate text-sm sm:text-base">${video.title}</h3>
+                            <div class="flex items-center justify-between text-[10px] sm:text-xs text-gray-400">
+                                <span>${video.year} · ${video.genre || this.getCategoryName(video.category)}</span>
+                                <span class="flex items-center text-yellow-400"><i class="fas fa-star mr-0.5 text-[8px] sm:text-[10px]"></i>${video.rating}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            renderAll() {
+                const filtered = this.currentCategory === 'all' 
+                    ? this.videos 
+                    : this.videos.filter(v => v.category === this.currentCategory);
+
+                const emptyHtml = '<div class="col-span-full text-center py-12 text-gray-500"><i class="fas fa-film text-4xl mb-3 opacity-30"></i><p>该分类暂无视频</p></div>';
+
+                if (filtered.length === 0) {
+                    document.getElementById('trendingGrid').innerHTML = emptyHtml;
+                    document.getElementById('newGrid').innerHTML = emptyHtml;
+                    document.getElementById('ratedGrid').innerHTML = emptyHtml;
+                    return;
+                }
+
+                const trending = [...filtered].sort((a, b) => b.rating - a.rating).slice(0, 5);
+                document.getElementById('trendingGrid').innerHTML = trending.map(v => this.createCard(v)).join('');
+
+                const newReleases = [...filtered].sort((a, b) => b.year - a.year).slice(0, 5);
+                document.getElementById('newGrid').innerHTML = newReleases.map(v => this.createCard(v)).join('');
+
+                const topRated = [...filtered].sort((a, b) => b.rating - a.rating).slice(0, 5);
+                document.getElementById('ratedGrid').innerHTML = topRated.map(v => this.createCard(v)).join('');
+            },
+
+            filterCategory(category) {
+                this.currentCategory = category;
+                document.querySelectorAll('.category-pill').forEach(pill => {
+                    pill.classList.remove('active', 'bg-primary', 'text-white');
+                    pill.classList.add('bg-white/5', 'text-gray-300');
+                });
+                if (event.target) {
+                    event.target.classList.add('active', 'bg-primary', 'text-white');
+                    event.target.classList.remove('bg-white/5', 'text-gray-300');
+                }
+                this.renderAll();
+                this.loadContinueWatching();
+            },
+
+            handleSearch(query) {
+                if (!query) {
+                    this.renderAll();
+                    document.getElementById('continueSection').style.display = '';
+                    return;
+                }
+                
+                const lower = query.toLowerCase();
+                const filtered = this.videos.filter(v => 
+                    v.title.toLowerCase().includes(lower) || 
+                    (v.genre && v.genre.toLowerCase().includes(lower)) ||
+                    (v.description && v.description.toLowerCase().includes(lower))
+                );
+
+                document.getElementById('trendingGrid').innerHTML = filtered.map(v => this.createCard(v)).join('') || '<div class="col-span-full text-center py-12 text-gray-500">无搜索结果</div>';
+                document.getElementById('newGrid').parentElement.style.display = 'none';
+                document.getElementById('ratedGrid').parentElement.style.display = 'none';
+                document.getElementById('continueSection').style.display = 'none';
+            },
+
+            showDetails(id) {
+                const video = this.videos.find(v => v.id === id);
+                if (!video) return;
+
+                this.currentDetailId = id;
+                this.currentEpisode = 0;
+                
+                const totalEpisodes = video.totalEpisodes || video.episodes?.length || 0;
+                const isSeries = video.category === 'series' || totalEpisodes > 0;
+                
+                document.getElementById('detailImage').src = video.backdrop || video.poster;
+                document.getElementById('detailTitle').textContent = video.title;
+                document.getElementById('detailYear').textContent = video.year;
+                document.getElementById('detailGenre').textContent = video.genre || this.getCategoryName(video.category);
+                document.getElementById('detailRating').textContent = video.rating;
+                document.getElementById('detailDuration').textContent = video.duration;
+                document.getElementById('detailEpisodesCount').textContent = isSeries ? (totalEpisodes > 0 ? `共${totalEpisodes}集` : '剧集') : '电影';
+                document.getElementById('detailDesc').textContent = video.description || '暂无简介';
+
+                const epSection = document.getElementById('detailEpisodes');
+                const epList = document.getElementById('detailEpisodeList');
+                
+                if (video.episodes && video.episodes.length > 0) {
+                    epSection.classList.remove('hidden');
+                    epList.innerHTML = video.episodes.map((ep, i) => `
+                        <button onclick="app.playEpisode(${i})" class="w-full text-left p-3 rounded-lg bg-gray-800 hover:bg-gray-700 transition-all border border-gray-700 active:scale-95">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium">第${ep.ep}集</span>
+                                <i class="fas fa-play-circle text-gray-500 text-xs"></i>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1 truncate">${ep.title}</p>
+                        </button>
+                    `).join('');
+                } else {
+                    epSection.classList.add('hidden');
+                }
+
+                const similar = this.videos.filter(v => 
+                    (v.genre === video.genre || v.category === video.category) && v.id !== id
+                ).slice(0, 4);
+                
+                document.getElementById('similarGrid').innerHTML = similar.length > 0 
+                    ? similar.map(v => `
+                        <div class="cursor-pointer group" onclick="app.showDetails('${v.id}')">
+                            <div class="aspect-video rounded-lg overflow-hidden mb-2 bg-gray-800">
+                                <img src="${v.poster}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" onerror="this.src='https://via.placeholder.com/600x340?text=No+Image'">
+                            </div>
+                            <h4 class="text-xs sm:text-sm font-medium truncate group-hover:text-primary transition-colors">${v.title}</h4>
+                            <p class="text-[10px] sm:text-xs text-gray-500">${v.year} · ${v.genre || this.getCategoryName(v.category)}</p>
+                        </div>
+                    `).join('')
+                    : '<div class="col-span-full text-center text-gray-500 py-4 text-sm">暂无相似推荐</div>';
+
+                document.getElementById('detailsModal').classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            },
+
+            closeDetails() {
+                document.getElementById('detailsModal').classList.add('hidden');
+                document.body.style.overflow = '';
+            },
+
+            playHero() {
+                if (this.videos.length === 0) return;
+                const hero = [...this.videos].sort((a, b) => b.rating - a.rating)[0];
+                this.playVideo(hero.id);
+            },
+
+            showHeroDetails() {
+                if (this.videos.length === 0) return;
+                const hero = [...this.videos].sort((a, b) => b.rating - a.rating)[0];
+                this.showDetails(hero.id);
+            },
+
+            playVideo(id, episodeIndex = 0) {
+                const video = this.videos.find(v => v.id === id);
+                if (!video) return;
+
+                this.currentDetailId = id;
+                this.currentEpisode = episodeIndex;
+
+                let url = video.videoUrl;
+                let title = video.title;
+
+                if (video.episodes && video.episodes.length > 0) {
+                    if (video.episodes[episodeIndex]) {
+                        url = video.episodes[episodeIndex].url;
+                        title = `${video.title} - 第${video.episodes[episodeIndex].ep}集 ${video.episodes[episodeIndex].title}`;
+                    }
+                }
+
+                if (!url) {
+                    this.showToast('暂无播放链接');
+                    return;
+                }
+
+                const player = document.getElementById('mainVideo');
+                const source = player.querySelector('source');
+                source.src = url;
+                player.load();
+                
+                document.getElementById('playerTitle').textContent = title;
+                
+                // 处理选集按钮和面板
+                const toggleBtn = document.getElementById('episodeToggleBtn');
+                const placeholder = document.getElementById('episodeTogglePlaceholder');
+                const epList = document.getElementById('episodeList');
+                
+                if (video.episodes && video.episodes.length > 0) {
+                    toggleBtn.classList.remove('hidden');
+                    placeholder.classList.add('hidden');
+                    epList.innerHTML = video.episodes.map((ep, i) => `
+                        <button onclick="app.switchEpisode(${i})" 
+                                class="episode-item w-full text-left p-3 rounded-lg transition-all active:scale-[0.98] ${i === episodeIndex ? 'active' : ''}">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium ${i === episodeIndex ? 'text-primary' : 'text-white'}">第${ep.ep}集</span>
+                                ${i === episodeIndex ? '<span class="text-xs bg-primary text-white px-2 py-0.5 rounded-full">播放中</span>' : '<i class="fas fa-play-circle text-gray-500 text-xs"></i>'}
+                            </div>
+                            <p class="text-xs mt-1 truncate ${i === episodeIndex ? 'text-gray-300' : 'text-gray-500'}">${ep.title}</p>
+                        </button>
+                    `).join('');
+                    
+                    // 自动显示选集面板（首次打开时）
+                    setTimeout(() => this.toggleEpisodePanel(true), 300);
+                } else {
+                    toggleBtn.classList.add('hidden');
+                    placeholder.classList.remove('hidden');
+                    this.toggleEpisodePanel(false);
+                }
+
+                document.getElementById('playerModal').classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+                
+                // 视频加载完成后尝试播放
+                player.addEventListener('loadedmetadata', () => {
+                    player.play().catch(e => console.log('Auto-play prevented:', e));
+                }, { once: true });
+                
+                // 如果已经加载过元数据，直接播放
+                if (player.readyState >= 1) {
+                    player.play().catch(e => console.log('Auto-play prevented:', e));
+                }
+            },
+
+            playEpisode(index) {
+                this.closeDetails();
+                setTimeout(() => {
+                    if (this.currentDetailId) this.playVideo(this.currentDetailId, index);
+                }, 300);
+            },
+
+            switchEpisode(index) {
+                if (this.currentDetailId) {
+                    document.getElementById('mainVideo').pause();
+                    this.playVideo(this.currentDetailId, index);
+                }
+            },
+
+            playCurrentDetail() {
+                if (this.currentDetailId !== null) {
+                    this.closeDetails();
+                    setTimeout(() => this.playVideo(this.currentDetailId, 0), 300);
+                }
+            },
+
+            closePlayer() {
+                const player = document.getElementById('mainVideo');
+                player.pause();
+                player.currentTime = 0;
+                player.querySelector('source').src = '';
+                document.getElementById('playerModal').classList.add('hidden');
+                this.toggleEpisodePanel(false);
+                document.body.style.overflow = '';
+            },
+
+            goHome() {
+                this.currentCategory = 'all';
+                document.querySelectorAll('.category-pill').forEach((pill, i) => {
+                    pill.classList.remove('active', 'bg-primary', 'text-white');
+                    pill.classList.add('bg-white/5', 'text-gray-300');
+                    if (i === 0) {
+                        pill.classList.add('active', 'bg-primary', 'text-white');
+                        pill.classList.remove('bg-white/5', 'text-gray-300');
+                    }
+                });
+                this.renderAll();
+                this.loadContinueWatching();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            },
+
+            showToast(message) {
+                const toast = document.getElementById('toast');
+                document.getElementById('toastMessage').textContent = message;
+                toast.classList.remove('translate-y-20', 'opacity-0');
+                setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>

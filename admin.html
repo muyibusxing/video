@@ -1,0 +1,656 @@
+<!-- admin.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>StreamVibe 管理后台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #0f172a; color: #e2e8f0; }
+        .glass { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+        .input-dark { background: #1e293b; border: 1px solid #334155; color: white; }
+        .input-dark:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 2px rgba(59,130,246,0.3); }
+        .episode-row { animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+        .invalid { border-color: #ef4444 !important; }
+        /* 移动端优化 */
+        .btn-touch { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; }
+        @media (max-width: 640px) {
+            .form-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <nav class="glass fixed top-0 w-full z-50 border-b border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-cog text-white"></i>
+                </div>
+                <h1 class="text-xl font-bold hidden sm:block">StreamVibe 管理后台</h1>
+                <h1 class="text-lg font-bold sm:hidden">管理后台</h1>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="admin.exportJSON()" class="text-xs sm:text-sm bg-green-600 hover:bg-green-700 px-3 py-2 rounded-lg transition-colors btn-touch">
+                    <i class="fas fa-download mr-1"></i><span class="hidden sm:inline">导出</span>
+                </button>
+                <a href="video.html" class="text-sm text-gray-400 hover:text-white transition-colors btn-touch px-3 py-2">
+                    <i class="fas fa-external-link-alt"></i><span class="hidden sm:inline ml-1">前台</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 pt-20 pb-12 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- 左侧表单 -->
+        <div class="lg:col-span-1 space-y-6">
+            <div class="glass rounded-2xl p-5 lg:sticky lg:top-24">
+                <h2 class="text-lg font-bold mb-4" id="formTitle">添加视频</h2>
+                <form id="videoForm" onsubmit="admin.saveVideo(event)" class="space-y-4">
+                    <input type="hidden" id="editId" value="">
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">视频标题 *</label>
+                        <input type="text" id="title" required maxlength="100"
+                               class="w-full px-4 py-3 rounded-lg input-dark transition-colors" placeholder="输入视频标题">
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">分类 *</label>
+                            <select id="category" class="w-full px-4 py-3 rounded-lg input-dark transition-colors bg-no-repeat bg-[right_1rem_center] bg-[length:1em]">
+                                <option value="movie">电影</option>
+                                <option value="series">剧集</option>
+                                <option value="documentary">纪录片</option>
+                                <option value="anime">动漫</option>
+                                <option value="variety">综艺</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">年份</label>
+                            <input type="number" id="year" min="1900" max="2100" class="w-full px-4 py-3 rounded-lg input-dark transition-colors" placeholder="2024" value="2024">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">评分 (0-10)</label>
+                            <input type="number" id="rating" step="0.1" max="10" min="0" class="w-full px-4 py-3 rounded-lg input-dark transition-colors" placeholder="8.5" value="8.0">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">总集数</label>
+                            <input type="number" id="totalEpisodes" min="1" max="999" class="w-full px-4 py-3 rounded-lg input-dark transition-colors" placeholder="如: 12" value="">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">时长/每集时长</label>
+                        <input type="text" id="duration" maxlength="50" class="w-full px-4 py-3 rounded-lg input-dark transition-colors" placeholder="如: 45分钟/集 或 2小时30分">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1" id="urlLabel">视频链接 (MP4/M3U8)</label>
+                        <input type="url" id="videoUrl" class="w-full px-4 py-3 rounded-lg input-dark transition-colors" placeholder="https://..." onblur="admin.validateUrl(this)">
+                        <p class="text-xs text-gray-500 mt-1">电影/单集直接填此处，剧集请在下方添加分集</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">封面图 URL</label>
+                        <input type="url" id="poster" class="w-full px-4 py-3 rounded-lg input-dark transition-colors" placeholder="https://..." onblur="admin.validateUrl(this)">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">背景图 URL</label>
+                        <input type="url" id="backdrop" class="w-full px-4 py-3 rounded-lg input-dark transition-colors" placeholder="https://..." onblur="admin.validateUrl(this)">
+                    </div>
+                    
+                    <!-- 分集区域优化 -->
+                    <div id="episodesSection" class="hidden border-t border-gray-700 pt-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <label class="text-sm font-medium text-gray-400">分集链接</label>
+                            <div class="flex items-center space-x-2">
+                                <button type="button" onclick="admin.addEpisode()" class="text-xs bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded transition-colors btn-touch">
+                                    <i class="fas fa-plus mr-1"></i>添加
+                                </button>
+                                <button type="button" onclick="admin.autoFillEpisodes()" class="text-xs bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded transition-colors btn-touch">
+                                    <i class="fas fa-magic mr-1"></i>自动填充
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <p class="text-xs text-gray-500">链接模板（用 {ep} 代替集数）:</p>
+                            <input type="text" id="episodeTemplate" class="w-full mt-1 px-3 py-2 rounded-lg input-dark text-xs" placeholder="如: https://example.com/video_{ep}.mp4">
+                        </div>
+                        <div id="episodesList" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">简介</label>
+                        <textarea id="description" rows="3" maxlength="500" class="w-full px-4 py-3 rounded-lg input-dark transition-colors resize-none" placeholder="视频简介..."></textarea>
+                    </div>
+                    
+                    <div class="flex space-x-3 pt-2">
+                        <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors btn-touch">
+                            <i class="fas fa-save mr-1"></i>保存
+                        </button>
+                        <button type="button" onclick="admin.resetForm()" class="px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors btn-touch">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 右侧列表 -->
+        <div class="lg:col-span-2">
+            <div class="glass rounded-2xl p-5">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-3">
+                    <h2 class="text-lg font-bold">视频库 <span id="videoCount" class="text-gray-500 text-sm font-normal">(0)</span></h2>
+                    <div class="flex items-center space-x-2 w-full sm:w-auto">
+                        <input type="text" id="adminSearch" oninput="admin.search(this.value)" 
+                               class="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500 w-full sm:w-48" 
+                               placeholder="搜索视频...">
+                        <select id="filterCategory" onchange="admin.filterList(this.value)" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none">
+                            <option value="all">全部分类</option>
+                            <option value="movie">电影</option>
+                            <option value="series">剧集</option>
+                            <option value="documentary">纪录片</option>
+                            <option value="anime">动漫</option>
+                            <option value="variety">综艺</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="videoList" class="space-y-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JSON Export Modal (保持原样，仅调整内边距) -->
+    <div id="jsonModal" class="fixed inset-0 z-[100] hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-gray-900 rounded-2xl max-w-2xl w-full max-h-[80vh] flex flex-col border border-gray-700">
+            <div class="flex items-center justify-between p-4 border-b border-gray-800">
+                <h3 class="font-bold">导出 data.json</h3>
+                <button onclick="admin.closeJsonModal()" class="text-gray-400 hover:text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-800">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-4 flex-1 overflow-auto">
+                <p class="text-sm text-gray-400 mb-2">请复制以下内容，保存为 <code class="bg-gray-800 px-2 py-1 rounded">data.json</code> 并上传到服务器根目录</p>
+                <textarea id="jsonOutput" class="w-full h-64 bg-gray-800 text-green-400 font-mono text-xs p-4 rounded-lg resize-none focus:outline-none" readonly></textarea>
+            </div>
+            <div class="p-4 border-t border-gray-800 flex flex-col sm:flex-row justify-end gap-2">
+                <button onclick="admin.copyToClipboard()" class="px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors btn-touch text-sm">
+                    <i class="fas fa-copy mr-1"></i>复制到剪贴板
+                </button>
+                <button onclick="admin.downloadJSON()" class="px-4 py-3 bg-green-600 hover:bg-green-700 rounded-lg transition-colors btn-touch text-sm">
+                    <i class="fas fa-download mr-1"></i>下载文件
+                </button>
+                <button onclick="admin.closeJsonModal()" class="px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors btn-touch text-sm">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 预览弹窗 -->
+    <div id="previewModal" class="fixed inset-0 z-50 hidden bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-gray-900 rounded-2xl max-w-4xl w-full overflow-hidden border border-gray-700">
+            <div class="flex items-center justify-between p-4 border-b border-gray-800">
+                <h3 class="font-bold">预览</h3>
+                <button onclick="admin.closePreview()" class="w-8 h-8 rounded-full hover:bg-gray-800 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="aspect-video bg-black">
+                <video id="previewVideo" controls class="w-full h-full"></video>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const XssGuard = {
+            escapeHtml(str) {
+                if (!str) return '';
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            },
+            sanitizeUrl(url) {
+                if (!url) return '';
+                const trimmed = url.trim();
+                if (!trimmed) return '';
+                if (!/^https?:\/\//i.test(trimmed)) return '';
+                if (/^(javascript|data|vbscript|file):/i.test(trimmed)) return '';
+                try {
+                    const parsed = new URL(trimmed);
+                    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+                    return trimmed;
+                } catch (e) {
+                    return '';
+                }
+            },
+            sanitizeText(str, maxLength = 500) {
+                if (!str) return '';
+                let cleaned = str.trim();
+                if (cleaned.length > maxLength) cleaned = cleaned.substring(0, maxLength);
+                cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+                cleaned = cleaned.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+                cleaned = cleaned.replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
+                cleaned = cleaned.replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '');
+                cleaned = cleaned.replace(/<embed\b[^<]*>/gi, '');
+                cleaned = cleaned.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                return cleaned;
+            },
+            clampNumber(val, min, max, defaultVal) {
+                const num = parseFloat(val);
+                if (isNaN(num)) return defaultVal;
+                return Math.max(min, Math.min(max, num));
+            },
+            generateId() {
+                return 'v' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+            }
+        };
+
+        const admin = {
+            videos: [],
+            editingId: null,
+
+            init() {
+                this.loadData();
+                this.renderList();
+                this.setupCategoryListener();
+            },
+
+            setupCategoryListener() {
+                document.getElementById('category').addEventListener('change', (e) => {
+                    const section = document.getElementById('episodesSection');
+                    const urlLabel = document.getElementById('urlLabel');
+                    if (e.target.value === 'series' || e.target.value === 'anime') {
+                        section.classList.remove('hidden');
+                        urlLabel.textContent = '首集链接 (可选)';
+                    } else {
+                        section.classList.add('hidden');
+                        urlLabel.textContent = '视频链接 (MP4/M3U8)';
+                    }
+                });
+            },
+
+            loadData() {
+                try {
+                    const stored = localStorage.getItem('streamvibe_videos');
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        this.videos = Array.isArray(parsed) ? parsed : (parsed.videos || []);
+                        this.videos = this.videos.map(v => this.sanitizeVideo(v));
+                    }
+                } catch (e) {
+                    console.error('Load error:', e);
+                    this.videos = [];
+                }
+            },
+
+            saveData() {
+                localStorage.setItem('streamvibe_videos', JSON.stringify(this.videos));
+            },
+
+            sanitizeVideo(video) {
+                const totalEpisodes = XssGuard.clampNumber(video.totalEpisodes, 1, 999, video.episodes?.length || 0);
+                return {
+                    id: XssGuard.sanitizeText(video.id, 50) || XssGuard.generateId(),
+                    title: XssGuard.sanitizeText(video.title, 100),
+                    category: ['movie', 'series', 'documentary', 'anime', 'variety'].includes(video.category) 
+                        ? video.category : 'movie',
+                    year: XssGuard.clampNumber(video.year, 1900, 2100, 2024),
+                    rating: XssGuard.clampNumber(video.rating, 0, 10, 8.0),
+                    totalEpisodes: totalEpisodes,
+                    duration: XssGuard.sanitizeText(video.duration, 50),
+                    videoUrl: XssGuard.sanitizeUrl(video.videoUrl),
+                    poster: XssGuard.sanitizeUrl(video.poster),
+                    backdrop: XssGuard.sanitizeUrl(video.backdrop),
+                    description: XssGuard.sanitizeText(video.description, 500),
+                    episodes: Array.isArray(video.episodes) ? video.episodes.map(ep => ({
+                        ep: XssGuard.clampNumber(ep.ep, 1, 9999, 1),
+                        title: XssGuard.sanitizeText(ep.title, 100),
+                        url: XssGuard.sanitizeUrl(ep.url)
+                    })).filter(ep => ep.url) : [],
+                    progress: XssGuard.clampNumber(video.progress, 0, 100, 0),
+                    createdAt: video.createdAt || Date.now(),
+                    updatedAt: Date.now()
+                };
+            },
+
+            validateUrl(input) {
+                const url = XssGuard.sanitizeUrl(input.value);
+                if (input.value && !url) {
+                    input.classList.add('invalid');
+                    return false;
+                } else {
+                    input.classList.remove('invalid');
+                    return true;
+                }
+            },
+
+            addEpisode() {
+                const list = document.getElementById('episodesList');
+                const index = list.children.length + 1;
+                const div = document.createElement('div');
+                div.className = 'episode-row flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 bg-gray-800/50 p-3 rounded-lg';
+                div.innerHTML = `
+                    <span class="text-xs text-gray-500 w-8">E${index}</span>
+                    <input type="text" placeholder="剧集标题" maxlength="100" class="w-full sm:flex-1 bg-transparent text-sm focus:outline-none episode-title" required>
+                    <input type="url" placeholder="视频链接" class="w-full sm:flex-1 bg-transparent text-sm focus:outline-none text-blue-400 episode-url" required onblur="admin.validateUrl(this)">
+                    <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-300 px-2 py-1 self-end sm:self-center">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                list.appendChild(div);
+            },
+
+            autoFillEpisodes() {
+                const template = document.getElementById('episodeTemplate').value.trim();
+                const totalEpisodes = parseInt(document.getElementById('totalEpisodes').value) || 0;
+                
+                if (!template || totalEpisodes < 1) {
+                    alert('请先填写总集数和链接模板');
+                    return;
+                }
+                if (!template.includes('{ep}')) {
+                    alert('模板中必须包含 {ep} 作为集数占位符');
+                    return;
+                }
+
+                const list = document.getElementById('episodesList');
+                list.innerHTML = '';
+
+                for (let i = 1; i <= totalEpisodes; i++) {
+                    const url = template.replace(/{ep}/g, i);
+                    const div = document.createElement('div');
+                    div.className = 'episode-row flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 bg-gray-800/50 p-3 rounded-lg';
+                    div.innerHTML = `
+                        <span class="text-xs text-gray-500 w-8">E${i}</span>
+                        <input type="text" placeholder="剧集标题" maxlength="100" class="w-full sm:flex-1 bg-transparent text-sm focus:outline-none episode-title" value="第${i}集">
+                        <input type="url" placeholder="视频链接" class="w-full sm:flex-1 bg-transparent text-sm focus:outline-none text-blue-400 episode-url" value="${XssGuard.escapeHtml(url)}" required onblur="admin.validateUrl(this)">
+                        <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-300 px-2 py-1 self-end sm:self-center">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    `;
+                    list.appendChild(div);
+                }
+            },
+
+            saveVideo(e) {
+                e.preventDefault();
+                
+                const title = document.getElementById('title').value.trim();
+                if (!title) {
+                    alert('请输入视频标题');
+                    return;
+                }
+
+                const category = document.getElementById('category').value;
+                const isSeries = category === 'series' || category === 'anime';
+                
+                const episodes = [];
+                if (isSeries) {
+                    document.querySelectorAll('.episode-row').forEach(row => {
+                        const titleEl = row.querySelector('.episode-title');
+                        const urlEl = row.querySelector('.episode-url');
+                        if (titleEl && urlEl) {
+                            const epUrl = XssGuard.sanitizeUrl(urlEl.value);
+                            if (epUrl) {
+                                episodes.push({
+                                    ep: episodes.length + 1,
+                                    title: XssGuard.sanitizeText(titleEl.value, 100) || `第${episodes.length + 1}集`,
+                                    url: epUrl
+                                });
+                            }
+                        }
+                    });
+                }
+
+                const videoUrl = XssGuard.sanitizeUrl(document.getElementById('videoUrl').value);
+                const totalEpisodesInput = parseInt(document.getElementById('totalEpisodes').value) || 0;
+                const actualEpisodes = episodes.length;
+                const totalEpisodes = totalEpisodesInput > 0 ? totalEpisodesInput : actualEpisodes;
+
+                const video = {
+                    id: this.editingId || XssGuard.generateId(),
+                    title: title,
+                    category: category,
+                    year: XssGuard.clampNumber(document.getElementById('year').value, 1900, 2100, 2024),
+                    rating: XssGuard.clampNumber(document.getElementById('rating').value, 0, 10, 8.0),
+                    totalEpisodes: totalEpisodes,
+                    duration: XssGuard.sanitizeText(document.getElementById('duration').value, 50),
+                    videoUrl: videoUrl,
+                    poster: XssGuard.sanitizeUrl(document.getElementById('poster').value) || 'https://via.placeholder.com/600x900?text=No+Poster',
+                    backdrop: XssGuard.sanitizeUrl(document.getElementById('backdrop').value),
+                    description: XssGuard.sanitizeText(document.getElementById('description').value, 500),
+                    episodes: episodes,
+                    progress: 0,
+                    updatedAt: Date.now()
+                };
+
+                if (this.editingId) {
+                    const index = this.videos.findIndex(v => v.id === this.editingId);
+                    if (index !== -1) {
+                        video.createdAt = this.videos[index].createdAt;
+                        this.videos[index] = video;
+                    }
+                } else {
+                    video.createdAt = Date.now();
+                    this.videos.unshift(video);
+                }
+
+                this.saveData();
+                this.renderList();
+                this.resetForm();
+                this.showToast('保存成功！请导出 data.json 上传到服务器');
+            },
+
+            editVideo(id) {
+                const video = this.videos.find(v => v.id === id);
+                if (!video) return;
+
+                this.editingId = id;
+                document.getElementById('formTitle').textContent = '编辑视频';
+                document.getElementById('title').value = video.title;
+                document.getElementById('category').value = video.category;
+                document.getElementById('year').value = video.year;
+                document.getElementById('rating').value = video.rating;
+                document.getElementById('totalEpisodes').value = video.totalEpisodes || video.episodes?.length || '';
+                document.getElementById('duration').value = video.duration || '';
+                document.getElementById('videoUrl').value = video.videoUrl || '';
+                document.getElementById('poster').value = video.poster || '';
+                document.getElementById('backdrop').value = video.backdrop || '';
+                document.getElementById('description').value = video.description || '';
+
+                document.getElementById('category').dispatchEvent(new Event('change'));
+
+                if (video.episodes && video.episodes.length > 0) {
+                    const list = document.getElementById('episodesList');
+                    list.innerHTML = '';
+                    video.episodes.forEach(ep => {
+                        const div = document.createElement('div');
+                        div.className = 'episode-row flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 bg-gray-800/50 p-3 rounded-lg';
+                        div.innerHTML = `
+                            <span class="text-xs text-gray-500 w-8">E${ep.ep}</span>
+                            <input type="text" placeholder="剧集标题" maxlength="100" class="w-full sm:flex-1 bg-transparent text-sm focus:outline-none episode-title" value="${XssGuard.escapeHtml(ep.title)}">
+                            <input type="url" placeholder="视频链接" class="w-full sm:flex-1 bg-transparent text-sm focus:outline-none text-blue-400 episode-url" value="${XssGuard.escapeHtml(ep.url)}" required onblur="admin.validateUrl(this)">
+                            <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-300 px-2 py-1 self-end sm:self-center">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        `;
+                        list.appendChild(div);
+                    });
+                }
+
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            },
+
+            deleteVideo(id) {
+                if (!confirm('确定要删除这个视频吗？')) return;
+                this.videos = this.videos.filter(v => v.id !== id);
+                this.saveData();
+                this.renderList();
+                this.showToast('已删除');
+            },
+
+            previewVideo(url) {
+                const cleanUrl = XssGuard.sanitizeUrl(url);
+                if (!cleanUrl) {
+                    alert('无效的视频链接');
+                    return;
+                }
+                const modal = document.getElementById('previewModal');
+                const video = document.getElementById('previewVideo');
+                video.src = cleanUrl;
+                modal.classList.remove('hidden');
+                video.play();
+            },
+
+            closePreview() {
+                const modal = document.getElementById('previewModal');
+                const video = document.getElementById('previewVideo');
+                video.pause();
+                video.src = '';
+                modal.classList.add('hidden');
+            },
+
+            exportJSON() {
+                const data = {
+                    lastUpdated: new Date().toISOString(),
+                    videos: this.videos
+                };
+                const jsonStr = JSON.stringify(data, null, 2);
+                
+                document.getElementById('jsonOutput').value = jsonStr;
+                document.getElementById('jsonModal').classList.remove('hidden');
+            },
+
+            closeJsonModal() {
+                document.getElementById('jsonModal').classList.add('hidden');
+            },
+
+            copyToClipboard() {
+                const textarea = document.getElementById('jsonOutput');
+                textarea.select();
+                document.execCommand('copy');
+                this.showToast('已复制到剪贴板！');
+            },
+
+            downloadJSON() {
+                const data = {
+                    lastUpdated: new Date().toISOString(),
+                    videos: this.videos
+                };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'data.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                this.showToast('已下载 data.json');
+            },
+
+            renderList(filtered = this.videos) {
+                const container = document.getElementById('videoList');
+                document.getElementById('videoCount').textContent = `(${filtered.length})`;
+
+                if (filtered.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-12 text-gray-500">
+                            <i class="fas fa-film text-4xl mb-3 opacity-30"></i>
+                            <p>暂无视频，请添加</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = filtered.map(v => {
+                    const totalEp = v.totalEpisodes || v.episodes?.length || 0;
+                    const epBadge = totalEp > 0 ? `<span class="text-xs text-blue-400">${totalEp}集</span>` : '';
+                    return `
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 bg-gray-800/30 hover:bg-gray-800/50 p-4 rounded-xl transition-all group border border-transparent hover:border-gray-700">
+                        <img src="${XssGuard.escapeHtml(v.poster)}" alt="${XssGuard.escapeHtml(v.title)}" class="w-full sm:w-16 h-32 sm:h-24 object-cover rounded-lg bg-gray-700 flex-shrink-0" onerror="this.src='https://via.placeholder.com/600x900?text=No+Image'">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex flex-wrap items-center gap-2 mb-1">
+                                <h3 class="font-bold text-white truncate">${XssGuard.escapeHtml(v.title)}</h3>
+                                <span class="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300">${this.getCategoryName(v.category)}</span>
+                                ${epBadge}
+                            </div>
+                            <p class="text-sm text-gray-400 truncate mb-1">${XssGuard.escapeHtml(v.description) || '暂无简介'}</p>
+                            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                                <span><i class="fas fa-calendar mr-1"></i>${v.year}</span>
+                                <span><i class="fas fa-star mr-1 text-yellow-500"></i>${v.rating}</span>
+                                <span><i class="fas fa-clock mr-1"></i>${XssGuard.escapeHtml(v.duration)}</span>
+                                ${totalEp > 0 ? `<span><i class="fas fa-list mr-1"></i>${totalEp}集</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 self-end sm:self-center sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                            ${v.videoUrl ? `
+                            <button onclick="admin.previewVideo('${XssGuard.escapeHtml(v.videoUrl)}')" class="w-10 h-10 rounded-full bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white flex items-center justify-center transition-all btn-touch" title="预览">
+                                <i class="fas fa-play text-xs"></i>
+                            </button>` : ''}
+                            <button onclick="admin.editVideo('${XssGuard.escapeHtml(v.id)}')" class="w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-all btn-touch" title="编辑">
+                                <i class="fas fa-edit text-xs"></i>
+                            </button>
+                            <button onclick="admin.deleteVideo('${XssGuard.escapeHtml(v.id)}')" class="w-10 h-10 rounded-full bg-red-900/20 hover:bg-red-600 text-red-400 hover:text-white flex items-center justify-center transition-all btn-touch" title="删除">
+                                <i class="fas fa-trash text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                `}).join('');
+            },
+
+            getCategoryName(cat) {
+                const map = { movie: '电影', series: '剧集', documentary: '纪录片', anime: '动漫', variety: '综艺' };
+                return map[cat] || cat;
+            },
+
+            search(query) {
+                const lower = XssGuard.sanitizeText(query, 100).toLowerCase();
+                const filtered = this.videos.filter(v => 
+                    v.title.toLowerCase().includes(lower) ||
+                    (v.description && v.description.toLowerCase().includes(lower))
+                );
+                this.renderList(filtered);
+            },
+
+            filterList(category) {
+                if (category === 'all') {
+                    this.renderList();
+                } else {
+                    this.renderList(this.videos.filter(v => v.category === category));
+                }
+            },
+
+            resetForm() {
+                document.getElementById('videoForm').reset();
+                document.getElementById('episodesList').innerHTML = '';
+                document.getElementById('episodesSection').classList.add('hidden');
+                document.getElementById('formTitle').textContent = '添加视频';
+                this.editingId = null;
+                document.getElementById('year').value = 2024;
+                document.getElementById('rating').value = 8.0;
+                document.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
+            },
+
+            showToast(msg) {
+                const existing = document.querySelector('.toast-notification');
+                if (existing) existing.remove();
+                const toast = document.createElement('div');
+                toast.className = 'toast-notification fixed bottom-6 right-6 bg-green-600 text-white px-5 py-3 rounded-full shadow-2xl z-50 flex items-center space-x-2 text-sm font-medium';
+                toast.innerHTML = `<i class="fas fa-check-circle"></i><span>${XssGuard.escapeHtml(msg)}</span>`;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => admin.init());
+    </script>
+</body>
+</html>

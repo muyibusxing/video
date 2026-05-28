@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2026 新年致禧 | The Golden Celebration</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Noto+Serif+SC:wght@300;600&family=Playfair+Display:ital,wght@0,400;1,700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --gold-primary: #d4af37;
+            --gold-light: #f9e7ba;
+            --gold-dark: #917622;
+            --bg-deep: #050505;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html { height: 100%; overflow: hidden; background: #000; }
+        
+        body {
+            font-family: 'Noto Serif SC', serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gold-primary);
+        }
+
+        /* --- Canvas 放在最底层 --- */
+        #canvas-container {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* --- 1. 信封层 --- */
+        .envelope-stage {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 100;
+            transition: opacity 1s ease, transform 1s ease;
+        }
+        .envelope-stage.hidden { opacity: 0; pointer-events: none; transform: scale(1.1); }
+        .envelope-wrapper {
+            position: relative; width: 320px; height: 220px; cursor: pointer;
+            transform-style: preserve-3d; transition: transform 0.6s ease;
+        }
+        .envelope-wrapper:hover { transform: translateY(-5px); }
+        .envelope-part { position: absolute; width: 100%; height: 100%; background-color: #110b0b; border: 1px solid #4a3c1e; }
+        .envelope-front-left { position: absolute; bottom: 0; left: 0; width: 0; height: 0; border-style: solid; border-width: 110px 0 0 160px; border-color: transparent transparent transparent #110b0b; z-index: 3; filter: drop-shadow(1px -1px 2px rgba(0,0,0,0.5)); }
+        .envelope-front-right { position: absolute; bottom: 0; right: 0; width: 0; height: 0; border-style: solid; border-width: 0 0 110px 160px; border-color: transparent transparent #110b0b transparent; z-index: 3; filter: drop-shadow(-1px -1px 2px rgba(0,0,0,0.5)); }
+        .envelope-flap { position: absolute; top: 0; left: 0; width: 0; height: 0; border-style: solid; border-width: 110px 160px 0 160px; border-color: #110b0b transparent transparent transparent; z-index: 4; transform-origin: top; transition: transform 0.8s 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .wax-seal { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); width: 50px; height: 50px; background: linear-gradient(135deg, var(--gold-dark), var(--gold-primary)); border-radius: 50%; z-index: 5; box-shadow: 0 4px 8px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-family: 'Cinzel'; color: #2a1a00; font-weight: bold; transition: 0.5s; }
+        
+        .envelope-wrapper.is-open .envelope-flap { transform: rotateX(180deg); z-index: 1; }
+        .envelope-wrapper.is-open .wax-seal { opacity: 0; transform: scale(0.5); }
+        .click-hint { position: absolute; bottom: -50px; width: 100%; text-align: center; color: #665; font-size: 0.8rem; letter-spacing: 2px; animation: pulse 2s infinite; }
+
+        /* --- 2. 主内容卡片 --- */
+        .main-content {
+            position: relative; z-index: 50; text-align: center;
+            opacity: 0; transform: translateY(50px);
+            transition: all 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .main-content.show { opacity: 1; transform: translateY(0); }
+        .main-content.fade-out { opacity: 0; transform: scale(1.1); transition: all 1s ease; pointer-events: none; }
+
+        .card-frame {
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            background: rgba(20, 20, 20, 0.6);
+            backdrop-filter: blur(10px);
+            padding: 3rem;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        h1 { font-family: 'Cinzel', serif; font-size: 3.5rem; background: linear-gradient(to right, #aa8c2c, #f3e5ab, #aa8c2c); -webkit-background-clip: text; color: transparent; margin-bottom: 1rem; }
+        .sub-text { color: #ccc; line-height: 1.8; margin-bottom: 2rem; font-weight: 300; }
+        .highlight { color: var(--gold-primary); font-weight: 600; }
+
+        .countdown { display: flex; gap: 1.5rem; justify-content: center; margin-top: 2rem; }
+        .time-box { text-align: center; }
+        .time-val { font-family: 'Cinzel', serif; font-size: 2.5rem; color: var(--gold-light); display: block; }
+        .time-label { font-size: 0.7rem; color: #666; letter-spacing: 1px; text-transform: uppercase; }
+
+        /* --- 3. 新年快乐终极展示层 --- */
+        .grand-finale {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 200; pointer-events: none;
+            opacity: 0; transition: opacity 2s ease;
+        }
+        .grand-finale.active { opacity: 1; }
+        
+        .finale-year {
+            font-family: 'Cinzel', serif; font-size: 8rem; font-weight: 700;
+            color: var(--gold-light);
+            text-shadow: 0 0 30px rgba(212, 175, 55, 0.6);
+            transform: scale(0.8); opacity: 0;
+            animation: zoomIn 3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+        .finale-text {
+            font-family: 'Playfair Display', serif; font-size: 2rem; color: #fff;
+            letter-spacing: 0.5em; margin-top: 20px;
+            opacity: 0; transform: translateY(20px);
+            animation: slideUp 2s 1s ease forwards;
+        }
+
+        @keyframes zoomIn { to { transform: scale(1); opacity: 1; } }
+        @keyframes slideUp { to { transform: translateY(0); opacity: 1; } }
+        @keyframes pulse { 50% { opacity: 0.5; } }
+
+        /* 模拟按钮 */
+        .debug-btn {
+            position: fixed; bottom: 10px; right: 10px; opacity: 0.2;
+            background: transparent; border: 1px solid #333; color: #444;
+            font-size: 10px; padding: 5px; cursor: pointer; z-index: 999;
+        }
+        .debug-btn:hover { opacity: 1; color: var(--gold-primary); border-color: var(--gold-primary); }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 2.5rem; }
+            .card-frame { padding: 2rem 1rem; }
+            .finale-year { font-size: 4rem; }
+            .finale-text { font-size: 1.2rem; letter-spacing: 0.2em; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="canvas-container"></canvas>
+
+    <div class="envelope-stage" id="envelopeStage">
+        <div class="envelope-wrapper" id="envelope" onclick="openLetter()">
+            <div class="envelope-part"></div>
+            <div class="envelope-front-left"></div>
+            <div class="envelope-front-right"></div>
+            <div class="envelope-flap"></div>
+            <div class="wax-seal">2026</div>
+            <div class="click-hint">点击开启</div>
+        </div>
+    </div>
+
+    <div class="main-content" id="mainContent">
+        <div class="card-frame">
+            <h1>2026 倒计时</h1>
+            <div class="sub-text">
+                星河长明，岁月流金。<br>
+                愿您在 <span class="highlight">2026</span> 年，万事胜意。
+            </div>
+            <div class="countdown">
+                <div class="time-box"><span class="time-val" id="d">00</span><span class="time-label">DAYS</span></div>
+                <div class="time-box"><span class="time-val" id="h">00</span><span class="time-label">HOURS</span></div>
+                <div class="time-box"><span class="time-val" id="m">00</span><span class="time-label">MINS</span></div>
+                <div class="time-box"><span class="time-val" id="s">00</span><span class="time-label">SECS</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grand-finale" id="grandFinale">
+        <div class="finale-year">2026</div>
+        <div class="finale-text">HAPPY NEW YEAR</div>
+    </div>
+
+    <button class="debug-btn" onclick="startNewYearCelebration()">[预览跨年时刻]</button>
+
+    <script>
+        // --- 1. 交互逻辑 ---
+        function openLetter() {
+            document.getElementById('envelope').classList.add('is-open');
+            setTimeout(() => { document.getElementById('mainContent').classList.add('show'); }, 600);
+            setTimeout(() => { document.getElementById('envelopeStage').classList.add('hidden'); }, 1500);
+        }
+
+        // --- 2. 倒计时 & 触发器 ---
+        let countdownInterval;
+        function updateCountdown() {
+            const now = new Date();
+            // 设定目标：2026年1月1日
+            let target = new Date("Jan 1, 2026 00:00:00").getTime();
+            
+            // 如果已经过了2026，就设为明年，保证倒计时总是在跑
+            if (now.getTime() > target) {
+                 target = new Date("Jan 1, 2027 00:00:00").getTime();
+            }
+
+            const diff = target - now.getTime();
+
+            if (diff <= 1000) { 
+                // 倒计时结束
+                startNewYearCelebration();
+                return;
+            }
+
+            const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const s = Math.floor((diff % (1000 * 60)) / 1000);
+
+            document.getElementById('d').innerText = d < 10 ? '0'+d : d;
+            document.getElementById('h').innerText = h < 10 ? '0'+h : h;
+            document.getElementById('m').innerText = m < 10 ? '0'+m : m;
+            document.getElementById('s').innerText = s < 10 ? '0'+s : s;
+        }
+
+        countdownInterval = setInterval(updateCountdown, 1000);
+        updateCountdown();
+
+        // --- 3. 跨年庆祝逻辑 ---
+        let isCelebration = false;
+        function startNewYearCelebration() {
+            if(isCelebration) return;
+            isCelebration = true;
+            clearInterval(countdownInterval);
+
+            // 1. 隐藏倒计时卡片
+            document.getElementById('mainContent').classList.add('fade-out');
+            
+            // 2. 显示高潮层
+            setTimeout(() => {
+                document.getElementById('grandFinale').classList.add('active');
+            }, 800);
+
+            // 3. 改变粒子系统状态 -> 开启烟花模式
+            fireworksEnabled = true;
+        }
+
+        // --- 4. Canvas 高级粒子/烟花系统 ---
+        const canvas = document.getElementById('canvas-container');
+        const ctx = canvas.getContext('2d');
+        let w, h;
+        let ambientParticles = [];
+        let fireworks = [];
+        let fireworksEnabled = false;
+
+        function resize() {
+            w = canvas.width = window.innerWidth;
+            h = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // 基础环境粒子 (之前的浮动金粉)
+        class AmbientParticle {
+            constructor() {
+                this.reset();
+            }
+            reset() {
+                this.x = Math.random() * w;
+                this.y = h + Math.random() * 100;
+                this.speed = 0.5 + Math.random() * 1;
+                this.radius = 0.5 + Math.random() * 1.5;
+                this.alpha = Math.random() * 0.5;
+            }
+            update() {
+                this.y -= this.speed;
+                if (this.y < 0) this.reset();
+            }
+            draw() {
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = '#d4af37';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // 烟花粒子
+        class FireworkParticle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                // 爆炸扩散角度
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = Math.random() * 4 + 1; // 爆炸力度
+                this.vx = Math.cos(angle) * velocity;
+                this.vy = Math.sin(angle) * velocity;
+                this.life = 1; // 生命值 1.0 -> 0
+                this.decay = Math.random() * 0.015 + 0.01; // 衰减速度
+                this.color = color;
+                this.gravity = 0.05;
+            }
+            update() {
+                this.vx *= 0.95; // 空气阻力
+                this.vy *= 0.95;
+                this.vy += this.gravity; // 重力下垂
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+            }
+            draw() {
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // 烟花升空火箭
+        class Rocket {
+            constructor() {
+                this.x = Math.random() * w;
+                this.y = h;
+                this.targetY = h * 0.2 + Math.random() * (h * 0.4); // 爆炸高度
+                this.speed = 8 + Math.random() * 4;
+                this.color = Math.random() > 0.5 ? '#f3e5ab' : '#d4af37'; // 香槟色或金色
+                this.exploded = false;
+            }
+            update() {
+                this.y -= this.speed;
+                if (this.y <= this.targetY && !this.exploded) {
+                    this.exploded = true;
+                    createExplosion(this.x, this.y, this.color);
+                }
+            }
+            draw() {
+                if (this.exploded) return;
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+                ctx.fill();
+                // 拖尾
+                ctx.beginPath();
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 1;
+                ctx.moveTo(this.x, this.y);
+                ctx.lineTo(this.x, this.y + 15);
+                ctx.stroke();
+            }
+        }
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 60; i++) { // 爆炸粒子数量
+                fireworks.push(new FireworkParticle(x, y, color));
+            }
+        }
+
+        // 初始化环境粒子
+        for(let i=0; i<60; i++) ambientParticles.push(new AmbientParticle());
+
+        function loop() {
+            // 使用半透明填充实现拖尾效果，这比 clearRect 更有质感
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = 'rgba(5, 5, 5, 0.2)'; 
+            ctx.fillRect(0, 0, w, h);
+
+            // 绘制环境粒子 (总是存在)
+            ctx.globalCompositeOperation = 'lighter';
+            ambientParticles.forEach(p => { p.update(); p.draw(); });
+
+            // 绘制烟花 (庆祝模式下触发)
+            if (fireworksEnabled) {
+                // 随机发射火箭
+                if (Math.random() < 0.05) { // 发射频率
+                    fireworks.push(new Rocket());
+                }
+
+                for (let i = fireworks.length - 1; i >= 0; i--) {
+                    const p = fireworks[i];
+                    p.update();
+                    p.draw();
+                    // 清理死掉的粒子
+                    if ((p instanceof FireworkParticle && p.life <= 0) || (p instanceof Rocket && p.exploded)) {
+                         if(p instanceof Rocket) {
+                            // Rocket 爆炸后只留爆炸微粒，Rocket本身从数组移除，但要确保在移除前生成了爆炸
+                            fireworks.splice(i, 1);
+                         } else {
+                            fireworks.splice(i, 1);
+                         }
+                    }
+                }
+            }
+            
+            requestAnimationFrame(loop);
+        }
+        loop();
+
+    </script>
+</body>
+</html>

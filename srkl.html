@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>生日快乐</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #f0f2f5; 
+            font-family: "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+            height: 100vh;
+            width: 100vw;
+            transition: background-color 1s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* --- 小弹窗样式 --- */
+        .tip-window {
+            position: absolute;
+            width: 320px;
+            height: 160px;
+            border-radius: 16px;
+            /* 增加更柔和的发光阴影 */
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 0 0 10px rgba(255, 255, 255, 0.2); 
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+            opacity: 0;
+            transform: scale(0.8);
+            animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; /* 更Q弹的动画 */
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            z-index: 20;
+        }
+
+        @keyframes popIn {
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .tip-text {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px; 
+            font-weight: bold;
+            line-height: 1.6;
+            color: #444; /* 字体深灰，不纯黑 */
+            text-shadow: 0px 1px 1px rgba(255,255,255,0.8);
+            width: 100%;
+        }
+
+        /* --- 修改后的按钮样式：清新风格 --- */
+        .close-btn {
+            background: linear-gradient(135deg, #ffffff 0%, #fff0f5 100%); /* 纯白微粉渐变 */
+            color: #ff6b81; /* 活泼的粉红色文字 */
+            border: none;
+            padding: 8px 28px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 8px;
+            /* 柔和的投影，让按钮浮起来 */
+            box-shadow: 0 4px 10px rgba(255, 107, 129, 0.2); 
+            transition: all 0.2s ease;
+            touch-action: manipulation;
+        }
+        .close-btn:hover, .close-btn:active { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(255, 107, 129, 0.3);
+            background: #fff;
+        }
+
+        /* --- 开始按钮层 --- */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+            transition: opacity 1s ease;
+        }
+        
+        #start-overlay h1 {
+            color: #444;
+            margin-bottom: 30px;
+            font-weight: normal;
+            text-align: center;
+            font-size: 2em;
+        }
+
+        #start-btn {
+            padding: 15px 45px;
+            font-size: 22px;
+            background: linear-gradient(45deg, #ff9a9e 0%, #fad0c4 99%, #fad0c4 100%);
+            color: #fff;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 107, 129, 0.4);
+            animation: pulseBtn 2s infinite;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        @keyframes pulseBtn {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* --- 烟花画布 --- */
+        #fireworks-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 5;
+            pointer-events: none;
+            display: none; 
+        }
+
+        /* --- 最终大弹窗 --- */
+        #final-modal {
+            display: none;
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            width: 85%;
+            max-width: 650px;
+            background: rgba(255, 255, 255, 0.96); 
+            border-radius: 25px;
+            padding: 40px;
+            text-align: center;
+            z-index: 10000;
+            box-shadow: 0 0 60px rgba(255, 215, 0, 0.5), 0 0 30px rgba(255, 105, 180, 0.3);
+            border: 4px solid #FFD700;
+            backdrop-filter: blur(10px);
+            animation: bigPopIn 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, floatBox 3s ease-in-out infinite 1s;
+            box-sizing: border-box;
+        }
+
+        #final-text {
+            font-size: 42px;
+            font-weight: 900;
+            background: linear-gradient(to right, #ff0000, #ff7300, #e1ff00, #00ff00, #00ffff, #0000ff, #8000ff);
+            background-size: 200%;
+            -webkit-background-clip: text;
+            color: transparent;
+            margin-bottom: 25px;
+            animation: rainbowText 5s linear infinite;
+            word-break: keep-all;
+        }
+
+        #final-subtext {
+            font-size: 20px;
+            color: #555;
+            margin-bottom: 35px;
+            line-height: 1.8;
+            font-style: italic;
+        }
+
+        #replay-btn {
+            background: #ff6b81;
+            color: white;
+            border: none;
+            padding: 12px 35px;
+            font-size: 18px;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(255, 71, 87, 0.3);
+            transition: transform 0.2s;
+        }
+        #replay-btn:active { transform: scale(0.95); }
+
+        @keyframes bigPopIn {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+        @keyframes floatBox {
+            0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+            50% { transform: translate(-50%, -50%) translateY(-15px); }
+        }
+        @keyframes rainbowText {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
+
+        /* --- 手机端适配 --- */
+        @media screen and (max-width: 768px) {
+            #start-overlay h1 { font-size: 1.5em; margin-bottom: 20px; }
+            #start-btn { padding: 12px 35px; font-size: 18px; }
+            
+            .tip-window {
+                width: 82vw; 
+                height: auto;
+                min-height: 140px;
+                padding: 18px;
+            }
+            .tip-text { font-size: 15px; }
+            .close-btn { padding: 8px 30px; font-size: 14px; }
+
+            #final-modal { width: 90%; padding: 30px 20px; border-width: 3px; }
+            #final-text { font-size: 28px; margin-bottom: 15px; }
+            #final-subtext { font-size: 15px; margin-bottom: 25px; line-height: 1.6; }
+            #replay-btn { font-size: 16px; padding: 10px 30px; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="fireworks-canvas"></canvas>
+
+    <div id="start-overlay">
+        <h1>✨ 准备好接收这份心意了吗？ ✨</h1>
+        <button id="start-btn" onclick="startSequence()">开启祝福</button>
+    </div>
+
+    <div id="final-modal">
+        <div id="final-text">FLY生日快乐！</div>
+        <div id="final-subtext">
+            “愿你岁岁常欢愉，年年皆胜意。”<br>
+            愿你一生被爱，一生有光。<br>
+            愿你所愿皆如愿，所行皆坦途。
+        </div>
+        <button id="replay-btn" onclick="location.reload()">再看一次</button>
+    </div>
+
+    <script>
+        const tips = [
+            "愿你遇良人，予你欢喜城，长歌暖浮生。", "愿你在未来的路上荣光顺逐，所向披靡。",
+            "好运为你绕，快乐来相抱，新的一天来报到。", "愿你眼里有星辰，身边有微风，心中有暖阳。",
+            "愿你一生有山可靠，有树可栖，与心爱之人四季常伴。", "愿你心暖如春，日子清澈明亮。",
+            "愿你的生活清甜又干净，未来一路繁花。", "愿你所有心事都有回应，所有期待都能如愿。",
+            "愿你平安喜乐，被温柔以待。", "愿你保持善良，拥有好运。",
+            "愿你的笑容成为别人心中的光。", "愿你所到之处皆为热土，所遇之人皆为良友。",
+            "愿你不畏将来，不念过往，活得潇洒自在。", "愿你人生道路光芒万丈，永不迷惘。",
+            "愿你的每一个愿望，都在烟花下开花。", "愿你眼底有光，心中有爱，脚下有风。",
+            "愿你以梦为马，不负韶华。", "愿你在人间被温柔相待，也能成为别人的温柔。",
+            "愿所有美好如约而至，愿所有遗憾得到补偿。", "愿你被爱包围，也懂得爱自己。",
+            "愿所有的情绪被治愈，愿所有的努力都被回应。", "愿你抬头遇见满天星辰，低头有清风与我同行。",
+            "愿你所爱之人永远在旁，愿你所想一一实现。", "愿你走过千山万水，仍觉人间值得。",
+            "愿你喜欢的都拥有，得不到的都释怀。", "愿你所念皆如愿，所盼皆成真。",
+            "愿你每一个今天都比昨天更幸福。", "愿你沐春风而来，携星光而归。",
+            "愿你欢喜不缺，平安有余。", "愿你余生不长，但足够快乐。",
+            "愿你身旁总有温暖相伴，心里永存光亮。", "愿你被生活温柔相待，不再受伤。",
+            "愿你所遇皆良善，所行皆坦途。", "愿你的心被柔软包围，被世界善待。",
+            "愿你不负流年，不忘初心。", "愿你保持热爱，奔赴山海。",
+            "愿你在人群中永远闪闪发光。", "愿你经历风雨后依旧温柔如初。",
+            "愿你的世界永远明亮，心中永远温暖。", "愿你从此以后，眼里是笑，心里是光。",
+            "愿你日子清净，抬头遇见的都是柔情。", "愿你一生被爱，一生有光。",
+            "愿你白天有说有笑，晚上睡个好觉。", "愿你所有心酸都变成惊喜。",
+            "愿你的努力和善良，被世界温柔以待。", "愿你天黑有灯，下雨有伞，一路有良人。",
+            "愿你保持赤子之心，拥有永不枯萎的热爱。", "愿你如星辰耀眼，如花朵绽放。",
+            "愿你岁岁常欢愉，年年皆胜意。", "愿你的生活甜甜，烦恼少少。",
+            "愿你的故事多云有雨，却始终有彩虹。", "愿你拥抱生活，也被生活拥抱。",
+            "愿你知足且上进，温柔且坚定。", "愿你在最美的时光里，遇见最美的自己。",
+            "愿你余生明亮，未来璀璨。", "愿你无论身处何地，都能感受到被需要。",
+            "愿你的所有奔赴，都值得期待。", "愿你所愿皆如愿，心上人永相随。"
+        ];
+
+        // 柔和莫兰迪背景色
+        const bgColors = [
+            '#E0F7FA', '#F3E5F5', '#E8F5E9', '#FFF3E0', 
+            '#FCE4EC', '#E1F5FE', '#F9FBE7', '#ECEFF1',
+            '#F3E5F5', '#E0F2F1', '#FFFDE7', '#F1F8E9'
+        ];
+
+        let popUpInterval;
+        let zIndexCounter = 100;
+        let globalCreateFirework = null; 
+
+        // --- 核心流程控制 ---
+        function startSequence() {
+            // 1. 隐藏开始界面
+            document.getElementById('start-overlay').style.opacity = '0';
+            setTimeout(() => { document.getElementById('start-overlay').style.display = 'none'; }, 1000);
+            
+            // 2. 变黑夜
+            document.body.style.backgroundColor = "#050510";
+
+            // 3. 启动烟花
+            initFireworks();
+
+            // 4. 发射大烟花 (3秒后)
+            setTimeout(() => {
+                launchBigOne();
+            }, 3000);
+        }
+
+        function launchBigOne() {
+            if (globalCreateFirework) {
+                // 大烟花，位置居中偏上
+                globalCreateFirework(window.innerWidth / 2, window.innerHeight * 0.35, true);
+            }
+
+            // 5. 大烟花爆炸后开始弹窗
+            setTimeout(() => {
+                startPopUps();
+            }, 1500);
+        }
+
+        function startPopUps() {
+            popUpInterval = setInterval(createWindow, 300);
+
+            // 6. 12秒后显示最终卡片
+            setTimeout(() => {
+                clearInterval(popUpInterval);
+                document.getElementById('final-modal').style.display = 'block';
+            }, 12000);
+        }
+
+        function createWindow() {
+            const tip = tips[Math.floor(Math.random() * tips.length)];
+            const bgColor = bgColors[Math.floor(Math.random() * bgColors.length)];
+            
+            const win = document.createElement('div');
+            win.className = 'tip-window';
+            win.style.backgroundColor = bgColor;
+            win.style.zIndex = zIndexCounter++;
+
+            const windowW = window.innerWidth;
+            const windowH = window.innerHeight;
+            let winWidth = 320; 
+            let winHeight = 160;
+            
+            if (windowW <= 768) {
+                winWidth = windowW * 0.82; 
+                winHeight = 160;
+            }
+
+            const maxX = Math.max(0, windowW - winWidth - 10);
+            const maxY = Math.max(0, windowH - winHeight - 10);
+
+            const x = Math.random() * maxX;
+            const y = Math.random() * maxY;
+
+            win.style.left = x + 'px';
+            win.style.top = y + 'px';
+
+            win.innerHTML = `
+                <div class="tip-text">${tip}</div>
+                <button class="close-btn" onclick="this.parentElement.remove()">收下祝福</button>
+            `;
+            
+            document.body.appendChild(win);
+        }
+
+        // --- 升级版物理烟花 ---
+        function initFireworks() {
+            const canvas = document.getElementById('fireworks-canvas');
+            canvas.style.display = 'block';
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            let particles = [];
+            
+            function Particle(x, y, color, isBig = false) {
+                this.x = x; 
+                this.y = y; 
+                this.color = color;
+                // 爆炸力度：大烟花更猛烈
+                const velocityMultiplier = isBig ? 14 : 5; 
+                const angle = Math.random() * Math.PI * 2;
+                // 速度随机性
+                const velocityVal = Math.random() * velocityMultiplier;
+                
+                this.velocity = { 
+                    x: Math.cos(angle) * velocityVal, 
+                    y: Math.sin(angle) * velocityVal
+                };
+
+                this.alpha = 1; 
+                this.friction = 0.96; // 空气阻力
+                this.gravity = 0.05;  // 增加重力，让烟花下坠
+                this.size = isBig ? Math.random() * 3 + 1.5 : Math.random() * 2 + 0.5; 
+                this.decay = isBig ? 0.008 : 0.02; // 消失速度
+            }
+
+            Particle.prototype.draw = function() {
+                ctx.save(); 
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
+                ctx.fillStyle = this.color; 
+                ctx.fill();
+                ctx.restore();
+            }
+
+            Particle.prototype.update = function() {
+                this.velocity.x *= this.friction; 
+                this.velocity.y *= this.friction;
+                this.velocity.y += this.gravity; // 应用重力
+                
+                this.x += this.velocity.x; 
+                this.y += this.velocity.y;
+                this.alpha -= this.decay;
+            }
+
+            globalCreateFirework = function(x, y, isBig = false) {
+                const colors = ['#ff7675', '#74b9ff', '#55efc4', '#ffeaa7', '#a29bfe', '#fd79a8'];
+                
+                // 大烟花增加金色系
+                if(isBig) colors.push('#FFD700', '#FFA500', '#FFFFFF');
+
+                const baseCount = isBig ? 350 : 40; 
+                
+                for (let i = 0; i < baseCount; i++) {
+                    const color = colors[Math.floor(Math.random() * colors.length)];
+                    particles.push(new Particle(x, y, color, isBig));
+                }
+            }
+
+            function animate() {
+                requestAnimationFrame(animate);
+                // 拖尾效果
+                ctx.fillStyle = 'rgba(5, 5, 16, 0.15)'; 
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                particles.forEach((particle, index) => {
+                    if (particle.alpha > 0) {
+                        particle.update();
+                        particle.draw();
+                    } else {
+                        particles.splice(index, 1);
+                    }
+                });
+            }
+            animate();
+
+            // 自动燃放循环
+            setInterval(() => {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * (canvas.height * 0.5); // 限制在上半部分
+                globalCreateFirework(x, y, false);
+            }, 800);
+            
+            // 初始一发
+            globalCreateFirework(canvas.width/2, canvas.height/4, false);
+        }
+
+        window.addEventListener('resize', () => {
+            const canvas = document.getElementById('fireworks-canvas');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>
